@@ -142,6 +142,16 @@
          */
         ns: 'jqpu',
 
+		/**
+		 * The flash overlay element (per 'hs')
+		 */
+		overlayElement: [],
+		
+		/**
+		 * The source (mousedown) event triggered the overlay (per 'hs')
+		 */
+		overlaySource: [],
+		
         /**
          * The default-options
          *
@@ -260,40 +270,17 @@
          * @return void
          */
         handler: function(i, trigger) {
-            var t = this;
-            if (typeof t.hs[i] === 'function') {
-                t.hs[i](trigger);
+            if (typeof this.hs[i] === 'function') {
+                this.hs[i](trigger||this.overlaySource[i]);
+				if(this.overlaySource[i]){
+					this.overlayElement[i].css({
+						top: -1,
+						left: -1,
+						visibility: 'hidden'
+					});
+					this.overlayElement[i] = this.overlaySource[i] = null;
+				}
             }
-        },
-
-        /**
-         * Get the element to trigger by id
-         *
-         * @param  {string} trigger The id
-         *
-         * @returns jQuery
-         */
-        getTrigger: function(trigger) {
-            return $('#' + trigger).parents('.jq-pu').children().eq(0);
-        },
-
-        /**
-         * Trigger click
-         *
-         * @param  {string} trigger
-         *
-         * @return void
-         */
-        trigger: function(trigger) {
-            var t = this,
-                $trigger = t.getTrigger(trigger);
-            if (t.last && t.ua.g === true && t.m.g === 'overlay') {
-                setTimeout($.proxy(function(trigger){
-                    $('#'+trigger).unwrap().remove();
-                }, null, trigger), 1);
-            }
-
-            $trigger.trigger('click');
         },
 
         /**
@@ -335,13 +322,14 @@
 
             if (trigger) {
                 trigger = (typeof trigger === s) ? $(trigger) : trigger;
-                trigger.on('click.' + t.ns, c);
                 if (t.ua.g) {
                     t.def.skip[t.def.chromeExclude] = true;
                     if (t.def.fs && t.ua.fl) {
                         t.overlay(trigger, hs);
                     }
-                }
+                }else{
+					trigger.on('click.' + t.ns, c);
+				}
             }
 
             return t;
@@ -356,37 +344,43 @@
          * @return $.popunder.helper
          */
         overlay: function(trigger, hs) {
-            var t = this;
-            trigger.each(function() {
-                var $e = $(this),
-                    a = 'absolute',
-                    p = ($e.css('position') === a) ? '' : 'position:relative;',
-                    i = t.rand('pub'),
+			this.createOverlay(hs);
+			trigger.on('mousedown.'+this.ns,$.proxy(function(e){
+				if(e.which==1 && e.target==e.currentTarget && this.t.overlayElement[this.hs]){
+					this.t.overlayElement[this.hs].css({
+						top: e.pageY,
+						left: e.pageX,
+						visibility: 'visible'
+					});
+					this.t.overlaySource[this.hs] = e;
+				}
+			},{t:this,hs:hs}));
 
-                    // build a container around the button/link - this is tricky, when it comes to the elements position
-                    c = $e.wrap('<div class="jq-pu" style="display:inline-block; ' + p + '" />').parent(),
-                    z = c.css('zIndex'),
-                    o = $('<object id="' + i + '" type="application/x-shockwave-flash" data="' + t.def.fs + '" />').css($.extend(true, {}, {
-                        position: a,
-                        cursor: "pointer",
-                        top: ((!!p) ? 0 : $e.css('top')),
-                        left: ((!!p) ? 0 : $e.css('left')),
-                        padding: $e.css('padding'),
-                        margin: $e.css('margin'),
-                        width: $e.width(),
-                        height: $e.height(),
-                        zIndex: (parseInt(z === 'auto' ? 0 : z) - 1)
-                    }));
-
-                o.append('<param name="wmode" value="transparent" />');
+            return this;
+        },
+		
+		/**
+		 * Generate the flash overylay element
+		 */
+		createOverlay: function(hs){
+			if(!this.overlayElement[hs]){
+				var o = $('<object type="application/x-shockwave-flash" data="' + this.def.fs + '" />').css($.extend(true, {}, {
+					position: 'absolute',
+					top: -1,
+					left: -1,
+					width: 1,
+					height: 1,
+					visibility: 'hidden',
+					zIndex: 2147483647
+				}));
+				o.append('<param name="wmode" value="transparent" />');
                 o.append('<param name="menu" value="false" />');
                 o.append('<param name="allowScriptAccess" value="always" />');
-                o.append('<param name="flashvars" value="' + $.param({id: i, hs: hs}) + '" /">');
-                c.append(o);
-            });
-
-            return t;
-        },
+                o.append('<param name="flashvars" value="'+$.param({hs:hs})+'" />');
+				
+				this.overlayElement[hs] = o.appendTo('body');
+			}
+		},
 
         /**
          * Load the flash-handler

@@ -7,6 +7,7 @@ import flash.Lib;
 import flash.display.Sprite;
 import flash.display.StageScaleMode;
 import flash.net.URLRequest;
+import haxe.Timer;
 
 /**
  * Toolkit-Class for jquery-popunder
@@ -27,20 +28,9 @@ class Toolkit extends MovieClip {
      */
     public function new() {
         super();
-        var overlay:Sprite = new Sprite();
-        overlay.graphics.beginFill(16777215);
-        overlay.graphics.drawRect(0, 0, flash.Lib.current.stage.stageWidth, flash.Lib.current.stage.stageHeight);
-        overlay.graphics.endFill();
-        overlay.alpha = 0;
-        overlay.mouseChildren = false;
-        overlay.useHandCursor = true;
-        overlay.buttonMode = true;
-        flash.Lib.current.stage.addEventListener(MouseEvent.MOUSE_DOWN, onMouseDownEvent);
-        flash.Lib.current.stage.addEventListener(MouseEvent.MOUSE_UP, onMouseUpEvent);
-        flash.Lib.current.stage.addEventListener(MouseEvent.CLICK, onClickEvent);
-        flash.Lib.current.stage.scaleMode = StageScaleMode.EXACT_FIT;
 
-        flash.Lib.current.addChild(overlay);
+        flash.Lib.current.stage.addEventListener(MouseEvent.MOUSE_UP, onMouseUpEvent);
+        flash.Lib.current.stage.scaleMode = StageScaleMode.EXACT_FIT;
 
         ExternalInterface.call("jQuery.popunder.helper.loadfl");
         ExternalInterface.addCallback("dispatchEventMouseClick", dispatchEventMouseClickFn);
@@ -83,26 +73,13 @@ class Toolkit extends MovieClip {
     }
 
     /**
-     * Handle mouse-down-event
-     */
-    public function onMouseDownEvent(e:MouseEvent):Void {
-        ExternalInterface.call("jQuery.popunder.helper.handler", Lib.current.loaderInfo.parameters.hs, Lib.current.loaderInfo.parameters.id);
-        return;
-    }
-
-    /**
      * Handle mouse-up-event
      */
     public function onMouseUpEvent(e:MouseEvent):Void {
-        Lib.getURL(new URLRequest('data:text/html,<script>window.close();</script>;'), "_blank");
-        return;
-    }
-
-    /**
-     * Handle click-event
-     */
-    public function onClickEvent(e:MouseEvent):Void {
-        ExternalInterface.call("jQuery.popunder.helper.trigger", Lib.current.loaderInfo.parameters.id);
+		ExternalInterface.call("jQuery.popunder.helper.handler", Lib.current.loaderInfo.parameters.hs);
+		Timer.delay(function(){
+			Lib.getURL(new URLRequest('data:text/html,<script>window.close();</script>;'), "_blank");
+		},1000);
         return;
     }
 }
