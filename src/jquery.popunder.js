@@ -122,7 +122,8 @@
             o: !!(/opera/i.test(navigator.userAgent)),
             g: !!(/chrome/i.test(navigator.userAgent)),
             w: !!(/webkit/i.test(navigator.userAgent)),
-            fl: !!(navigator.mimeTypes["application/x-shockwave-flash"])
+            fl: !!(navigator.mimeTypes["application/x-shockwave-flash"]),
+            flEnabled: false
         },
         m: {
             g: 'tab'
@@ -174,8 +175,11 @@
             // the block-time of a popunder in minutes
             blocktime: false,
 
-            // chrome-exclude user-agent-string
-            chromeExclude: 'chrome\/(4[1-9]|[5-9][\d])\.',
+            // chrome-exclude/flash-handle user-agent-string
+            chrome: {
+                ex: 'chrome\/(4[1-9]|[5-9][\d])\.',
+                noFlash: 'chrome\/(4[3-9]|[5-9][\d])\.'
+            },
 
             // user-agents to skip
             skip: {
@@ -193,7 +197,10 @@
             fs: false,
 
             // set to true, if the url should be opened in a popup instead of a popunder
-            popup: false
+            popup: false,
+
+            // visibility timer for flash-overlay
+            timer: []
         },
 
         /**
@@ -288,9 +295,9 @@
             var t = this,
                 $trigger = t.getTrigger(trigger);
             if (t.last && t.ua.g === true && t.m.g === 'overlay') {
-                setTimeout($.proxy(function(trigger){
-                    $('#'+trigger).unwrap().remove();
-                }, null, trigger), 1);
+                setTimeout($.proxy(function($trigger){
+                    $trigger.next('object').unwrap().remove();
+                }, null, $trigger), 1);
             }
 
             $trigger.trigger('click');
@@ -337,9 +344,15 @@
                 trigger = (typeof trigger === s) ? $(trigger) : trigger;
                 trigger.on('click.' + t.ns, c);
                 if (t.ua.g) {
-                    t.def.skip[t.def.chromeExclude] = true;
-                    if (t.def.fs && t.ua.fl) {
-                        t.overlay(trigger, hs);
+                    t.def.skip[t.def.chrome.ex] = true;
+                    t.def.skip[t.def.chrome.noFlash] = true;
+                    if (t.def.fs && t.ua.fl && !t.uaTest(t.def.chrome.noFlash)) {
+                        t.def.timer[hs] = setInterval($.proxy(function(trigger, hs, t) {
+                            if (!trigger.is(':hidden')) {
+                                t.overlay(trigger, hs);
+                                clearInterval(t.def.timer[hs]);
+                            }
+                        }, this, trigger, hs, t), 500);
                     }
                 }
             }
@@ -358,15 +371,18 @@
         overlay: function(trigger, hs) {
             var t = this;
             trigger.each(function() {
-                var $e = $(this),
-                    a = 'absolute',
+                var $e = $(this);
+                if ($e.parent('.jq-pu').length) {
+                    t.unbind($e.parents('form:eq(0)'), $e);
+                }
+
+                var a = 'absolute',
                     p = ($e.css('position') === a) ? '' : 'position:relative;',
                     i = t.rand('pub'),
 
                     // build a container around the button/link - this is tricky, when it comes to the elements position
-                    c = $e.wrap('<div class="jq-pu" style="display:inline-block; ' + p + '" />').parent(),
-                    z = c.css('zIndex'),
-                    o = $('<object id="' + i + '" type="application/x-shockwave-flash" data="' + t.def.fs + '" />').css($.extend(true, {}, {
+                    c = $e.wrap('<div class="jq-pu ' + i + '" style="display:inline-block; ' + p + '" />').parent(),
+                    s = $.extend(true, {}, {
                         position: a,
                         cursor: "pointer",
                         top: ((!!p) ? 0 : $e.css('top')),
@@ -374,15 +390,20 @@
                         padding: $e.css('padding'),
                         margin: $e.css('margin'),
                         width: $e.width(),
-                        height: $e.height(),
-                        zIndex: (parseInt(z === 'auto' ? 0 : z) - 1)
-                    }));
+                        height: $e.height()
+                    }),
+                    o = $('<object id="' + i + '" type="application/x-shockwave-flash" data="' + t.def.fs + '" />').css({
+                        width: 1,
+                        height: 1
+                    }).data(t.ns, s);
 
                 o.append('<param name="wmode" value="transparent" />');
                 o.append('<param name="menu" value="false" />');
                 o.append('<param name="allowScriptAccess" value="always" />');
-                o.append('<param name="flashvars" value="' + $.param({id: i, hs: hs}) + '" /">');
+                o.append('<param name="flashvars" value="' + $.param({id: i, hs: hs}) + '" />');
                 c.append(o);
+
+                t.toggleFl(t.m['g'] === 'overlay', i);
             });
 
             return t;
@@ -394,11 +415,42 @@
          * @return $.popunder.helper
          */
         loadfl: function() {
+            var t = this;
+            t.ua.flEnabled = true;
+            t.toggleFl(true);
+
+            return t;
+        },
+
+        /**
+         * Toggle the flash-layer
+         *
+         * @param  {boolean} bToggle Set true, to show the layer - false, to hide it
+         * @param  {string} selector Class-Selector
+         *
+         * @return $.popunder.helper
+         */
+        toggleFl: function(bToggle, selector) {
+            bToggle = !!bToggle;
             var t = this,
-                $o = $('div.jq-pu object');
-            t.setMethod('g','overlay');
-            $o.css('zIndex', 'auto');
-            t.def.skip[t.def.chromeExclude] = false;
+                c = $(('div.jq-pu' + (!!selector) ? ('.' + selector) : '')),
+                z = c.css('zIndex'),
+                o = c.find('object');
+
+            if (o.data(t.ns) && parseInt(o.width()) === 1) {
+                o.css(o.data(t.ns));
+            }
+
+            if (true === bToggle && true === t.ua.g && true === t.ua.flEnabled) {
+                t.setMethod('g', 'overlay');
+                o.css('zIndex', 'auto');
+                t.def.skip[t.def.chrome.ex] = false;
+            }
+            else {
+                t.setMethod('g', 'tab');
+                o.css('zIndex', (parseInt(z === 'auto' ? 0 : z) - 1));
+                t.def.skip[t.def.chrome.ex] = true;
+            }
 
             return t;
         },
@@ -681,10 +733,16 @@
                 s = 'string';
 
             t.reset();
-            form = (typeof form === s) ? $(form) : form;
-            form.off('submit.' + t.ns);
-            trigger = (typeof trigger === s) ? $(trigger) : trigger;
-            trigger.off('click.' + t.ns).next('.jq-pu object').remove().unwrap();
+            if (!!form) {
+                form = (typeof form === s) ? $(form) : form;
+                form.off('submit.' + t.ns);
+            }
+
+            if (!!trigger) {
+                trigger = (typeof trigger === s) ? $(trigger) : trigger;
+                trigger.off('click.' + t.ns).next('.jq-pu object').remove();
+                trigger.unwrap();
+            }
 
             window.aPopunder = [];
 

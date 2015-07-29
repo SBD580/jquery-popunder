@@ -9,7 +9,7 @@ Usage
 Popunders are popups which are opened in the background of a browser-window.
 This script will only work, if the popunder is opened on a user-generated event (e.g. click or submit).
 
-For examples, take a look at the index.html.
+For examples and usage documentation, take a look at the index.html.
 
 The recommended usage is the first example: a function to build the url-stack.
 So you leave the event-handling to the plugin. To add some flexibility to the function, the plugin will pass the initial event to the function - from which you may access e.g. DOM-data of the activated DOM-element.
@@ -40,13 +40,14 @@ Compatibility
 
 jquery-popunder was tested with:
 - Mozilla Firefox 3-37
-- Google Chrome 10-41
+- Google Chrome 10-42
 - Microsoft Internet Explorer 6-11
 - Apple Safari 5
 
 Known Issues
 -------
-- chrome 41 needs a flash-layer to create a popunder
+- chrome 41,42 needs a flash-layer to create a popunder
+-- chrome 43 is not supported yet
 - attention: the window-properties are currently not working in google chrome 28+
 - the script does not work with the Opera-Browser, so the opera-browser is disable by default
 - the script does not work in Firefox under Gnome
